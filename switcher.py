@@ -24,13 +24,40 @@ ctk.set_default_color_theme("blue")
 
 
 # Power settings
+_si = subprocess.STARTUPINFO()
+_si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+_si.wShowWindow = 0  # SW_HIDE
+_CREATE_NO_WINDOW = 0x08000000
+
+def _run_powercfg(setting, minutes):
+    subprocess.run(
+        ["powercfg", "/change", setting, str(minutes)],
+        check=True,
+        startupinfo=_si,
+        creationflags=_CREATE_NO_WINDOW,
+    )
+
 def apply_time(minutes):
-    try:
-        subprocess.run(["powercfg", "/change", "monitor-timeout-dc", str(minutes)], check=True)
-        subprocess.run(["powercfg", "/change", "monitor-timeout-ac", str(minutes)], check=True)
-        subprocess.run(["powercfg", "/change", "standby-timeout-dc", str(minutes)], check=True)
-        subprocess.run(["powercfg", "/change", "standby-timeout-ac", str(minutes)], check=True)
-    except subprocess.CalledProcessError:
+    settings = [
+        "monitor-timeout-dc",
+        "monitor-timeout-ac",
+        "standby-timeout-dc",
+        "standby-timeout-ac",
+    ]
+    errors = []
+
+    def _worker(setting):
+        try:
+            _run_powercfg(setting, minutes)
+        except subprocess.CalledProcessError:
+            errors.append(setting)
+
+    threads = [threading.Thread(target=_worker, args=(s,)) for s in settings]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if errors:
         messagebox.showerror("Error", "Run as Administrator")
 
 def toggle():

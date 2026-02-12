@@ -1,2 +1,6 @@
 build/
 dist/
+.gitignore
+*.spec
+*.pyc
+__pycache__/
