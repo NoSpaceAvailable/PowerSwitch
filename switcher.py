@@ -14,7 +14,6 @@ LONG = 60
 
 INTERVAL = 3  # seconds
 
-current_mode = SHORT
 is_plugged = False
 running = True
 tray_icon = None
@@ -28,6 +27,23 @@ _si = subprocess.STARTUPINFO()
 _si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 _si.wShowWindow = 0  # SW_HIDE
 _CREATE_NO_WINDOW = 0x08000000
+
+def _detect_current_mode():
+    """Query Windows for the active monitor-timeout-ac and return SHORT or LONG."""
+    try:
+        result = subprocess.run(
+            ["powercfg", "/query", "SCHEME_CURRENT", "SUB_VIDEO", "VIDEOIDLE"],
+            capture_output=True, text=True,
+            startupinfo=_si,
+            creationflags=_CREATE_NO_WINDOW,
+        )
+        for line in result.stdout.splitlines():
+            if "Current AC Power Setting Index" in line:
+                seconds = int(line.strip().split(":")[-1].strip(), 16)
+                return LONG if seconds >= LONG * 60 else SHORT
+    except Exception:
+        pass
+    return SHORT
 
 def _run_powercfg(setting, minutes):
     subprocess.run(
@@ -59,6 +75,8 @@ def apply_time(minutes):
         t.join()
     if errors:
         messagebox.showerror("Error", "Run as Administrator")
+
+current_mode = _detect_current_mode()
 
 def toggle():
     global current_mode
